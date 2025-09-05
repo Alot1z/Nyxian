@@ -1,0 +1,35 @@
+name: Build Nyxian IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        brew install make gcc
+
+    - name: Build Nyxian
+      run: |
+        make  # eller brug build.sh hvis tilgængeligt
+
+    - name: Create IPA
+      run: |
+        # Tilføj kommandoer til at pakke Nyxian som IPA
+        mkdir -p Payload
+        cp -r Nyxian.app Payload/
+        zip -r Nyxian.ipa Payload
+
+    - name: Upload IPA artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Nyxian-IPA
+        path: Nyxian.ipa

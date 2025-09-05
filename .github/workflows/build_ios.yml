@@ -1,7 +1,7 @@
-name: Build Nyxian IPA
+name: Build Nyxian IPA for TrollStore
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Manuel udløsning
   push:
     branches: [ main ]
 
@@ -10,26 +10,63 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: |
-        brew install make gcc
+      - name: Setup iOS build environment
+        run: |
+          # Installer den nødvendige toolchain (f.eks. iOS SDK og clang)
+          sudo xcode-select -switch /Applications/Xcode_15.2.app/Contents/Developer
+          export SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)
+          export CC=$(xcrun --sdk iphoneos --find clang)
+          export CFLAGS="-isysroot $SDKROOT -arch arm64 -miphoneos-version-min=15.0"
+          export LDFLAGS="-arch arm64 -isysroot $SDKROOT"
 
-    - name: Build Nyxian
-      run: |
-        make  # eller brug build.sh hvis tilgængeligt
+      - name: Build Nyxian binary
+        run: |
+          # Gå til kildekoden og kompiler
+          cd src
+          $CC $CFLAGS -o nyxian main.c $LDFLAGS
+          # Kontroller at den kompilerede fil findes
+          file nyxian
+          ls -la nyxian
 
-    - name: Create IPA
-      run: |
-        # Tilføj kommandoer til at pakke Nyxian som IPA
-        mkdir -p Payload
-        cp -r Nyxian.app Payload/
-        zip -r Nyxian.ipa Payload
+      - name: Create TrollStore IPA
+        run: |
+          # Opret en simpel app-bundle struktur til TrollStore
+          mkdir -p Payload/Nyxian.app
+          cp src/nyxian Payload/Nyxian.app/
+          # Opret en minimal Info.plist - KRITISK for at TrollStore accepterer den
+          cat > Payload/Nyxian.app/Info.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>nyxian</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.nyxian.ios</string>
+              <key>CFBundleName</key>
+              <string>Nyxian</string>
+              <key>CFBundleVersion</key>
+              <string>1.0</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0</string>
+              <key>CFBundleSupportedPlatforms</key>
+              <array>
+                  <string>iPhoneOS</string>
+              </array>
+              <key>MinimumOSVersion</key>
+              <string>15.0</string>
+          </dict>
+          </plist>
+          EOF
 
-    - name: Upload IPA artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Nyxian-IPA
-        path: Nyxian.ipa
+          # Pak til IPA
+          zip -r Nyxian.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nyxian-TrollStore-IPA
+          path: Nyxian.ipa
